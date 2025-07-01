@@ -26,4 +26,4 @@ fi
 
 WORKERS=${WORKERS:-1}
 WORKER_TIMEOUT=${WORKER_TIMEOUT:-30}
-gunicorn -w $WORKERS --timeout $WORKER_TIMEOUT -b 0.0.0.0:7878 --access-logfile - addok.http.wsgi
+ddtrace-run gunicorn -w $WORKERS --timeout $WORKER_TIMEOUT -b 0.0.0.0:7878 --access-logfile - addok.http.wsgi
