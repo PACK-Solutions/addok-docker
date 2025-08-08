@@ -1,0 +1,518 @@
+openapi: 3.0.3
+info:
+  title: Address API
+  version: "1.0.0"
+  description: |
+    OpenAPI 3 specification for the Address HTTP API.
+
+  contact:
+    name: PACK Solutions
+    url: https://www.pack-solutions.com/
+servers:
+  - url: https://dev.apim.gateway.pack-solutions.gravitee.cloud/adresse
+    description: Address API - developpement
+  - url: https://recette.apim.gateway.pack-solutions.gravitee.cloud/adresse
+    description: Address API - recette
+  - url: https://apim.gateway.pack-solutions.gravitee.cloud/adresse
+    description: Address API - production
+paths:
+  /search:
+    get:
+      tags: [Geocoding]
+      summary: Full text search (forward geocoding)
+      description: |
+        Performs a full text search and returns matching features in GeoCodeJSON format.
+
+        Notes:
+        - Parameter `lon` also accepts aliases `lng`, `long`, `longitude`.
+        - Parameter `lat` also accepts alias `latitude`.
+        - Any additional, configured filters (e.g. `type`, `postcode`, etc.) may be passed as extra query parameters and will narrow down results.
+      parameters:
+        - in: query
+          name: q
+          required: true
+          description: String to be searched.
+          schema:
+            type: string
+        - in: query
+          name: limit
+          description: Limit the number of results.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 5
+        - in: query
+          name: autocomplete
+          description: Activate or deactivate autocompletion.
+          schema:
+            type: boolean
+            default: true
+        - in: query
+          name: lat
+          description: Latitude used to prioritize results close to the given center (alias of `latitude`).
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: latitude
+          description: Alias for `lat`.
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: lon
+          description: "Longitude used to prioritize results close to the given center (aliases: `lng`, `long`, `longitude`)."
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: lng
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: long
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: longitude
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+      responses:
+        '200':
+          description: Successful search response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoCodeJSONFeatureCollection'
+              examples:
+                sample:
+                  summary: Example search payload
+                  value:
+                    attribution: BANO
+                    licence: ODbL
+                    query: 8 bd du port
+                    type: FeatureCollection
+                    version: draft
+                    features:
+                      - type: Feature
+                        geometry:
+                          type: Point
+                          coordinates: [2.29009, 49.897446]
+                        properties:
+                          context: "80, Somme, Picardie"
+                          housenumber: "8"
+                          label: "8 Boulevard du Port 80000 Amiens"
+                          postcode: "80000"
+                          id: "800216590L"
+                          score: 0.3351181818181818
+                          name: "8 Boulevard du Port"
+                          city: "Amiens"
+                          type: "housenumber"
+                      - type: Feature
+                        geometry:
+                          type: Point
+                          coordinates: [3.605875, 43.425232]
+                        properties:
+                          context: "34, Hérault, Languedoc-Roussillon"
+                          housenumber: "8"
+                          label: "8 Boulevard du Port 34140 Mèze"
+                          postcode: "34140"
+                          id: "341570770U"
+                          score: 0.3287575757575757
+                          name: "8 Boulevard du Port"
+                          city: "Mèze"
+                          type: "housenumber"
+        '400':
+          description: Invalid parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalid-lat:
+                  value:
+                    title: Invalid parameter
+                    description: 'The "lat" parameter is invalid. invalid value'
+        '413':
+          description: Query too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                too-long:
+                  value:
+                    title: 'Query too long, 16 chars, limit is 10'
+                    description: ''
+  /reverse:
+    get:
+      tags: [Geocoding]
+      summary: Reverse geocoding
+      description: |
+        Reverse geocode a coordinate. Returns features near the provided center in GeoCodeJSON format.
+
+        Notes:
+        - `lon` accepts aliases `lng`, `long`, `longitude`.
+        - `lat` accepts alias `latitude`.
+        - Any additional, configured filters may be passed as extra query parameters to narrow results.
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          description: Latitude of the center (alias of `latitude`).
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: latitude
+          required: false
+          description: Alias for `lat`.
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - in: query
+          name: lon
+          required: true
+          description: "Longitude of the center (aliases: `lng`, `long`, `longitude`)."
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: lng
+          required: false
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: long
+          required: false
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: longitude
+          required: false
+          description: Alias for `lon`.
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - in: query
+          name: limit
+          description: Maximum number of features to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 1
+      responses:
+        '200':
+          description: Successful reverse response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeoCodeJSONFeatureCollection'
+        '400':
+          description: Invalid or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        '200':
+          description: Health information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: HEALTHY
+                  redis_version:
+                    type: string
+                    example: "7.0.11"
+  /search/csv/:
+    post:
+      tags: [Geocoding, Batch]
+      summary: Batch forward geocoding from CSV
+      description: |
+        Batch geocode a CSV file by uploading it as multipart/form-data.
+
+        Parameters (multipart form fields unless specified otherwise):
+        - data: the CSV file to be processed (required)
+        - columns (multiple): the columns, ordered, to be used for geocoding; if no column is given, all columns will be used
+        - encoding (optional): encoding of the file (you can also specify a charset in the file mimetype), such as 'utf-8' or 'iso-8859-1' (default to 'utf-8-sig')
+        - delimiter (optional): CSV delimiter (, or ;); if not given, the server will try to guess
+        - with_bom (optional): if true, and if the encoding is utf-8, the returned CSV will contain a BOM (useful for Excel)
+        - lat and lon (optionals): provide column names that contain latitude and longitude values, to add a preference center in the geocoding of each row
+
+        Any additional query parameter can be used to pass a filter mapping as `filterName=columnName`, where the value is the name of the column in the CSV providing the filter value for each row.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  format: binary
+                  description: The CSV file to be processed.
+                columns:
+                  type: array
+                  description: Ordered list of columns to be used for geocoding. If omitted, all columns will be used.
+                  items:
+                    type: string
+                encoding:
+                  type: string
+                  description: File encoding. Defaults to utf-8-sig if not specified.
+                  example: utf-8
+                delimiter:
+                  type: string
+                  description: CSV field delimiter. If not specified, the server will try to guess it.
+                  enum: [",", ";"]
+                with_bom:
+                  type: boolean
+                  description: If true and encoding is utf-8, the returned CSV will contain a BOM.
+                  default: false
+                lat:
+                  type: string
+                  description: Column name containing latitude values to use as a preference center.
+                lon:
+                  type: string
+                  description: Column name containing longitude values to use as a preference center.
+              required: [data]
+      parameters:
+        - in: query
+          name: filters
+          description: |
+            Additional filters mapping. Any extra query parameter will be interpreted as a filter name with value equal to the column name holding the filter value (e.g., `citycode=code_insee`).
+          required: false
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: CSV with geocoding results.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+              examples:
+                sample:
+                  summary: Example of a resulting CSV (excerpt)
+                  value: |
+                    voie,ville,result_label,result_score,lon,lat
+                    "8 Boulevard du Port",Amiens,"8 Boulevard du Port 80000 Amiens",0.92,2.29009,49.897446
+        '400':
+          description: Invalid request (bad CSV, missing required fields, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /reverse/csv/:
+    post:
+      tags: [Geocoding, Batch]
+      summary: Batch reverse geocoding from CSV
+      description: |
+        Batch reverse geocode a CSV file by uploading it as multipart/form-data.
+
+        Parameters (multipart form fields unless specified otherwise):
+        - data: the CSV file to be processed; must contain columns latitude (or lat) and longitude (or lon or lng)
+        - encoding (optional): encoding of the file (you can also specify a charset in the file mimetype), such as 'utf-8' or 'iso-8859-1' (default to 'utf-8-sig')
+        - delimiter (optional): CSV delimiter (, or ;); if not given, the server will try to guess
+
+        Any filter can be passed as key=value querystring, where key is the filter name and value is the column name containing the filter value for each row. For example, if there is a column "code_insee" and we want to use it for "citycode" filtering, we would pass `citycode=code_insee`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  format: binary
+                  description: The CSV file to be processed. Must contain latitude/longitude columns.
+                encoding:
+                  type: string
+                  description: File encoding. Defaults to utf-8-sig if not specified.
+                  example: utf-8
+                delimiter:
+                  type: string
+                  description: CSV field delimiter. If not specified, the server will try to guess it.
+                  enum: [",", ";"]
+              required: [data]
+      parameters:
+        - in: query
+          name: filters
+          description: |
+            Additional filters mapping. Any extra query parameter will be interpreted as a filter name with value equal to the column name holding the filter value (e.g., `citycode=code_insee`).
+          required: false
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: CSV with reverse geocoding results.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+              examples:
+                sample:
+                  summary: Example of a resulting CSV (excerpt)
+                  value: |
+                    latitude,longitude,result_label,result_score,lon,lat
+                    49.897446,2.29009,"8 Boulevard du Port 80000 Amiens",0.92,2.29009,49.897446
+        '400':
+          description: Invalid request (bad CSV, missing required fields, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    GeoCodeJSONFeatureCollection:
+      type: object
+      description: GeoCodeJSON FeatureCollection
+      properties:
+        type:
+          type: string
+          enum: [FeatureCollection]
+        version:
+          type: string
+          example: draft
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/GeoJSONFeature'
+        attribution:
+          type: string
+          description: Data attribution
+          example: BANO
+        licence:
+          type: string
+          description: Data licence
+          example: ODbL
+        query:
+          type: string
+          description: Echo of the search query when applicable
+        filters:
+          type: object
+          additionalProperties: true
+          description: Filters applied to the search/reverse request
+        center:
+          type: array
+          description: Center used for prioritization [lon, lat]
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        limit:
+          type: integer
+          description: Limit applied to the request
+      required: [type, version, features, attribution, licence]
+    GeoJSONFeature:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Feature]
+        geometry:
+          $ref: '#/components/schemas/GeoJSONGeometry'
+        properties:
+          $ref: '#/components/schemas/Properties'
+      required: [type, geometry, properties]
+    GeoJSONGeometry:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [Point]
+        coordinates:
+          type: array
+          minItems: 2
+          items:
+            type: number
+          example: [2.29, 49.89]
+      required: [type, coordinates]
+    Properties:
+      type: object
+      description: Free-form properties returned by Addok for each feature.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          description: Document type (e.g., housenumber, street, city)
+        score:
+          type: number
+          format: float
+        label:
+          type: string
+        housenumber:
+          type: string
+        postcode:
+          type: string
+        city:
+          type: string
+        context:
+          type: string
+      additionalProperties: true
+    Error:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+      required: [title]

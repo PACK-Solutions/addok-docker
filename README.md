@@ -86,3 +86,24 @@ curl "http://localhost:7878/search?q=1+rue+de+la+paix+paris"
 | ----- | ----- |
 | `WORKERS` | Nombre de workers addok à lancer. Valeur par défaut : `1`. |
 | `WORKER_TIMEOUT` | [Durée maximale allouée à un worker](http://docs.gunicorn.org/en/0.17.2/configure.html#timeout) pour effectuer une opération de géocodage. Valeur par défaut : `30`. |
+
+## Documentation
+
+- Cas d’utilisation de l’API (géocodage direct/inverse, appels unitaires et en masse) : voir `DOC-UTILISATION-API.md` à la racine du dépôt.
+
+## Documentation OpenAPI
+
+Une spécification OpenAPI v3 décrivant l’API HTTP exposée par Addok est disponible dans le fichier `openapi.yaml` à la racine du dépôt.
+
+Vous pouvez l’ouvrir dans un viewer tel que:
+- Swagger Editor: https://editor.swagger.io/ (glissez-déposez le fichier `openapi.yaml`)
+- Redocly: https://redocly.github.io/redoc/ (utilisez l’URL locale du fichier si vous l’hébergez)
+
+Les endpoints documentés incluent:
+- `GET /search` (géocodage direct)
+- `GET /reverse` (géocodage inverse)
+- `POST /search/csv/` (géocodage direct en masse via CSV)
+- `POST /reverse/csv/` (géocodage inverse en masse via CSV)
+- `GET /health` (vérification d’état)
+
+Par défaut, l’instance écoute sur `http://localhost:7878` (configurable dans la section `servers` du fichier OpenAPI).
