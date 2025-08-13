@@ -19,7 +19,7 @@ WORKDIR /app
 # Copy the built tar.gz from the builder stage
 COPY --from=builder /build/addok-src/dist/addok-*.tar.gz ./addok-1.2.0.tar.gz
 
-RUN pip install cython ./addok-1.2.0.tar.gz addok-fr==1.0.1 addok-france==1.1.3 addok-csv==1.0.1 addok-sqlite-store==1.0.1 gunicorn==20.1.0
+RUN pip install cython ./addok-1.2.0.tar.gz addok-fr==1.0.1 addok-france==1.1.3 addok-csv==1.1.0 addok-sqlite-store==1.0.1 gunicorn==20.1.0
 
 ENV ADDOK_CONFIG_MODULE=/etc/addok/addok.patched.conf
 ENV REDIS_HOST=redis
