@@ -31,7 +31,7 @@ RUN pip wheel --no-cache-dir \
     ./dist/addok-*.tar.gz \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
-    addok-csv==1.0.1 \
+    addok-csv==1.1.0 \
     addok-sqlite-store==1.0.1 \
     gunicorn==23.0.0 \
     ddtrace \
