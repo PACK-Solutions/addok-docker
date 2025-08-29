@@ -34,7 +34,14 @@ RUN pip wheel --no-cache-dir \
     addok-csv==1.1.0 \
     addok-sqlite-store==1.0.1 \
     gunicorn==23.0.0 \
-    ddtrace \
+    opentelemetry-api \
+    opentelemetry-sdk \
+    opentelemetry-exporter-otlp \
+    opentelemetry-instrumentation-redis \
+    opentelemetry-instrumentation-sqlite3 \
+    opentelemetry-instrumentation-requests \
+    opentelemetry-propagator-b3 \
+    prometheus-client==0.19.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3 \
@@ -48,10 +55,17 @@ RUN pip install --no-cache-dir \
     addok \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
-    addok-csv==1.0.1 \
+    addok-csv==1.1.0 \
     addok-sqlite-store==1.0.1 \
     gunicorn==23.0.0 \
-    ddtrace \
+    opentelemetry-api \
+    opentelemetry-sdk \
+    opentelemetry-exporter-otlp \
+    opentelemetry-instrumentation-redis \
+    opentelemetry-instrumentation-sqlite3 \
+    opentelemetry-instrumentation-requests \
+    opentelemetry-propagator-b3 \
+    prometheus-client==0.19.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3
@@ -90,12 +104,16 @@ ENV REDIS_DB_INDEXES=0
 ENV SQLITE_DB_PATH=/data/addok.db
 ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 
-# Datadog tracing
-ENV DD_SERVICE="addok"
-ENV DD_ENV="production"
-ENV DD_VERSION="2.1.0"
-ENV DD_TRACE_ENABLED="true"
-ENV DD_LOGS_INJECTION="true"
+# OpenTelemetry configuration
+ENV OTEL_SERVICE_NAME="addok-ban"
+ENV OTEL_SERVICE_VERSION="2.1.5"
+ENV OTEL_RESOURCE_ATTRIBUTES="service.name=addok-ban,service.version=2.1.5,deployment.environment=production"
+ENV OTEL_EXPORTER_OTLP_ENDPOINT="http://alloy.monitoring.svc.cluster.local:4317"
+ENV OTEL_EXPORTER_OTLP_PROTOCOL="grpc"
+ENV OTEL_TRACES_EXPORTER="otlp"
+ENV OTEL_METRICS_EXPORTER="otlp"
+ENV OTEL_LOGS_EXPORTER="otlp"
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true"
 
 # Application configuration
 ENV WORKERS=2
@@ -109,14 +127,14 @@ ENV PRE_INDEXED_DATA_URL="https://adresse.data.gouv.fr/data/ban/adresses/latest/
 ENV DOWNLOAD_TIMEOUT=300
 ENV MAX_DOWNLOAD_RETRIES=3
 
-# Security labels
-LABEL com.datadoghq.tags.service="addok"
-LABEL com.datadoghq.tags.env="production"
-LABEL com.datadoghq.tags.version="2.1.0"
-LABEL org.opencontainers.image.title="Addok Geocoding Service (Alpine)"
-LABEL org.opencontainers.image.version="2.1.0"
+# OpenTelemetry labels
+LABEL otel.service.name="addok-ban"
+LABEL otel.service.version="2.1.5"
+LABEL otel.deployment.environment="production"
+LABEL org.opencontainers.image.title="Addok Geocoding Service with OpenTelemetry (Alpine)"
+LABEL org.opencontainers.image.version="2.1.5"
 LABEL org.opencontainers.image.base.name="python:3.11-alpine"
-LABEL org.opencontainers.image.description="Production-ready French address geocoding service (Alpine Linux)"
+LABEL org.opencontainers.image.description="Production-ready French address geocoding service with OpenTelemetry tracing (Alpine Linux)"
 
 # Copy enhanced entrypoint script
 COPY docker-entrypoint.sh /bin/docker-entrypoint.sh

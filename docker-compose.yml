@@ -7,8 +7,8 @@ services:
     - ./addok-data/addok.conf:/etc/addok/addok.conf
     - ./addok-data/addok.db:/data/addok.db
     - ./logs:/logs
-    links:
-    - addok-redis:redis
+    depends_on:
+    - addok-redis
     environment:
       - WORKERS=1
       - WORKER_TIMEOUT=30

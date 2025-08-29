@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Simplified Addok Entrypoint - Application Mode Only
-echo "=== Addok BAN Application Startup v2.1 ==="
+# Enhanced Addok Entrypoint with OpenTelemetry - Application Mode
+echo "=== Addok BAN Application Startup v2.1.5-otel ===
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
@@ -45,9 +45,36 @@ EOF
     log "✓ Configuration ready"
 }
 
+# Initialize OpenTelemetry environment
+setup_telemetry() {
+    log "Setting up OpenTelemetry..."
+    
+    # Validate OTEL configuration
+    local otel_endpoint=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    local otel_service=${OTEL_SERVICE_NAME:-addok-ban}
+    local otel_version=${OTEL_SERVICE_VERSION:-2.1.5}
+    
+    if [[ -n "$otel_endpoint" ]]; then
+        log "OpenTelemetry enabled:"
+        log "  Service: $otel_service"
+        log "  Version: $otel_version"
+        log "  Endpoint: $otel_endpoint"
+        log "  Protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}"
+        export OTEL_PYTHON_LOG_CORRELATION=true
+    else
+        log "OpenTelemetry endpoint not configured, using console export"
+    fi
+    
+    # Set additional OTEL environment variables
+    export OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=${OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED:-true}
+    export OTEL_PYTHON_LOG_LEVEL=${OTEL_PYTHON_LOG_LEVEL:-info}
+    
+    log "✓ OpenTelemetry configuration ready"
+}
+
 # Start the application
 start_application() {
-    log "Starting Addok application..."
+    log "Starting Addok application with OpenTelemetry..."
 
     local workers=${WORKERS:-4}
     local timeout=${WORKER_TIMEOUT:-30}
@@ -59,8 +86,18 @@ start_application() {
     log "  Port: $port"
     log "  Redis: ${REDIS_HOST:-redis}:${REDIS_PORT:-6379}"
     log "  Database: /data/addok.db"
+    log "  OTEL Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-console}"
 
-    # Start gunicorn
+    # Verify monitoring modules are available
+    if ! python3 -c "import sys; sys.path.insert(0, '/app'); from monitoring.telemetry import initialize_telemetry" >/dev/null 2>&1; then
+        log "WARNING: OpenTelemetry monitoring modules not found, falling back to standard WSGI"
+        WSGI_MODULE="addok.http.wsgi"
+    else
+        log "✓ OpenTelemetry modules found, using enhanced WSGI"
+        WSGI_MODULE="wsgi_otel:application"
+    fi
+    
+    # Start gunicorn with OpenTelemetry
     exec gunicorn \
         --workers "$workers" \
         --timeout "$timeout" \
@@ -69,7 +106,10 @@ start_application() {
         --error-logfile - \
         --log-level info \
         --preload \
-        addok.http.wsgi
+        --worker-class sync \
+        --max-requests 1000 \
+        --max-requests-jitter 100 \
+        "$WSGI_MODULE"
 }
 
 # Main execution
@@ -80,4 +120,5 @@ if [[ ! -f /data/addok.db ]]; then
 fi
 
 setup_configuration
+setup_telemetry
 start_application
