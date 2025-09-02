@@ -17,8 +17,7 @@ from addok.http.base import CorsMiddleware, register_http_endpoint
 
 # Import monitoring components
 from monitoring.telemetry import initialize_telemetry
-from monitoring.falcon_middleware import create_telemetry_middleware
-from monitoring.metrics_endpoint import metrics_bp
+from monitoring.falcon_middleware import create_telemetry_middleware, add_metrics_routes
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +58,8 @@ def create_application():
         # Register standard Addok endpoints
         register_http_endpoint(app)
         
-        # Add metrics endpoint
-        add_metrics_endpoint(app)
+        # Add metrics endpoints using Falcon resources
+        add_metrics_routes(app)
         
         # Register additional endpoints from hooks
         hooks.register_http_endpoint(app)
@@ -72,45 +71,6 @@ def create_application():
         logger.error(f"Failed to create WSGI application: {e}")
         raise
 
-def add_metrics_endpoint(app):
-    """Add Prometheus metrics endpoint to Falcon app"""
-    try:
-        from monitoring.metrics_endpoint import prometheus_metrics, health_metrics
-        
-        class MetricsResource:
-            def on_get(self, req, resp):
-                """Handle /metrics endpoint"""
-                try:
-                    metrics_response = prometheus_metrics()
-                    resp.text = metrics_response.data.decode('utf-8')
-                    resp.content_type = metrics_response.mimetype
-                    resp.status = falcon.HTTP_200
-                except Exception as e:
-                    logger.error(f"Error serving metrics: {e}")
-                    resp.text = "# Error generating metrics\n"
-                    resp.content_type = "text/plain"
-                    resp.status = falcon.HTTP_500
-        
-        class HealthMetricsResource:
-            def on_get(self, req, resp):
-                """Handle /health/metrics endpoint"""
-                try:
-                    health_response = health_metrics()
-                    resp.media = health_response[0]
-                    resp.status = f"HTTP_{health_response[1]}"
-                except Exception as e:
-                    logger.error(f"Error serving health metrics: {e}")
-                    resp.media = {"error": "Health check failed"}
-                    resp.status = falcon.HTTP_500
-        
-        # Add routes
-        app.add_route('/metrics', MetricsResource())
-        app.add_route('/health/metrics', HealthMetricsResource())
-        
-        logger.info("Metrics endpoints added to Falcon application")
-        
-    except Exception as e:
-        logger.warning(f"Failed to add metrics endpoint: {e}")
 
 # Create the WSGI application
 try:
