@@ -42,6 +42,9 @@ RUN pip wheel --no-cache-dir \
     opentelemetry-instrumentation-requests \
     opentelemetry-propagator-b3 \
     prometheus-client==0.19.0 \
+    psutil \
+    ddtrace \
+    falcon \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3 \
@@ -66,6 +69,9 @@ RUN pip install --no-cache-dir \
     opentelemetry-instrumentation-requests \
     opentelemetry-propagator-b3 \
     prometheus-client==0.19.0 \
+    psutil \
+    ddtrace \
+    falcon \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3
@@ -114,6 +120,7 @@ ENV OTEL_TRACES_EXPORTER="otlp"
 ENV OTEL_METRICS_EXPORTER="otlp"
 ENV OTEL_LOGS_EXPORTER="otlp"
 ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true"
+ENV OTEL_LOG_LEVEL="debug"
 
 # Application configuration
 ENV WORKERS=2
@@ -135,6 +142,11 @@ LABEL org.opencontainers.image.title="Addok Geocoding Service with OpenTelemetry
 LABEL org.opencontainers.image.version="2.1.5"
 LABEL org.opencontainers.image.base.name="python:3.11-alpine"
 LABEL org.opencontainers.image.description="Production-ready French address geocoding service with OpenTelemetry tracing (Alpine Linux)"
+
+# Copy OpenTelemetry monitoring modules
+COPY monitoring/ /app/monitoring/
+COPY wsgi_otel.py /app/wsgi_otel.py
+COPY gunicorn.conf.py /app/gunicorn.conf.py
 
 # Copy enhanced entrypoint script
 COPY docker-entrypoint.sh /bin/docker-entrypoint.sh

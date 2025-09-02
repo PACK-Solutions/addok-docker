@@ -7,6 +7,7 @@ import os
 import sys
 import logging
 import time
+import atexit
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -92,10 +93,24 @@ class AddokTelemetry:
                 self.tracer_provider.add_span_processor(console_processor)
                 logger.info("Console tracing initialized (development mode)")
             
-            # Get tracer instance
-            self.tracer = trace.get_tracer(__name__, version="2.1.5")
-            
+            # Get tracer instance  
+            self.tracer = trace.get_tracer(__name__)
             logger.info("OpenTelemetry tracing initialized successfully")
+
+            # Emit a test span to verify exporter works
+            try:
+                with self.tracer.start_as_current_span("telemetry_init_test") as span:
+                    span.set_attribute("init.check", True)
+                    span.set_attribute("service.name", "addok-ban")
+                self.tracer_provider.force_flush()
+                logger.info("✓ Test span created and flushed successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to emit test span: {e}")
+            
+            # Register atexit hook to flush spans on worker shutdown
+            atexit.register(self._cleanup_telemetry)
+            logger.info(f"🚀 Telemetry initialized in worker pid={os.getpid()}")
+            
             return True
             
         except Exception as e:
@@ -103,46 +118,55 @@ class AddokTelemetry:
             return False
             
     def initialize_metrics(self) -> bool:
-        """Initialize metrics collection"""
+        """Initialize metrics collection with OTLP export to Alloy"""
         try:
-            # Configure exporters
+            # Configure exporters based on environment
             otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+            metric_readers = []
             
             if otlp_endpoint and OTLP_AVAILABLE:
-                # Production: Use OTLP exporter
+                # Production: Use OTLP exporter to Alloy
                 try:
-                    metric_exporter = OTLPMetricExporter(
+                    otlp_exporter = OTLPMetricExporter(
                         endpoint=otlp_endpoint,
-                        insecure=True
+                        insecure=True  # Using internal cluster communication
                     )
-                    metric_reader = PeriodicExportingMetricReader(
-                        exporter=metric_exporter,
-                        export_interval_millis=15000,  # Export every 15 seconds
+                    otlp_reader = PeriodicExportingMetricReader(
+                        exporter=otlp_exporter,
+                        export_interval_millis=30000,  # Export every 30 seconds to Alloy
                     )
-                    logger.info(f"OTLP metrics initialized: {otlp_endpoint}")
+                    metric_readers.append(otlp_reader)
+                    logger.info(f"✓ OTLP metrics initialized: {otlp_endpoint}")
                 except Exception as e:
                     logger.warning(f"OTLP metrics setup failed: {e}, falling back to console")
-                    metric_reader = PeriodicExportingMetricReader(
-                        exporter=ConsoleMetricExporter(),
-                        export_interval_millis=60000,  # Less frequent for console
-                    )
-            else:
-                # Development: Use console exporter
-                metric_reader = PeriodicExportingMetricReader(
+            
+            # Also add console exporter for debugging (can be disabled in production)
+            if os.getenv("OTEL_METRICS_CONSOLE_DEBUG", "false").lower() == "true":
+                console_reader = PeriodicExportingMetricReader(
+                    exporter=ConsoleMetricExporter(),
+                    export_interval_millis=60000,  # Export every 60 seconds to console
+                )
+                metric_readers.append(console_reader)
+                logger.info("✓ Console metrics enabled for debugging")
+            
+            if not metric_readers:
+                # Fallback to console if no OTLP available
+                console_reader = PeriodicExportingMetricReader(
                     exporter=ConsoleMetricExporter(),
                     export_interval_millis=60000,
                 )
-                logger.info("Console metrics initialized (development mode)")
+                metric_readers.append(console_reader)
+                logger.info("✓ Console metrics initialized (fallback mode)")
             
             # Configure meter provider
             self.meter_provider = MeterProvider(
                 resource=self.resource,
-                metric_readers=[metric_reader]
+                metric_readers=metric_readers
             )
             metrics.set_meter_provider(self.meter_provider)
             
             # Get meter instance
-            self.meter = metrics.get_meter(__name__, version="2.1.5")
+            self.meter = metrics.get_meter(__name__)
             
             # Initialize custom metrics
             self._initialize_custom_metrics()
@@ -286,6 +310,15 @@ class AddokTelemetry:
         except Exception as e:
             logger.error(f"Failed to initialize telemetry: {e}")
             return False
+    
+    def _cleanup_telemetry(self):
+        """Cleanup telemetry on process exit"""
+        try:
+            if self.tracer_provider:
+                self.tracer_provider.force_flush()
+                logger.debug(f"🔄 Flushed spans on process exit pid={os.getpid()}")
+        except Exception as e:
+            logger.debug(f"Failed to flush spans on exit: {e}")
     
     def record_geocoding_request(self, endpoint: str, status: str, duration: float, 
                                query_length: int = 0, results_count: int = 0):
