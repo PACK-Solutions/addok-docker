@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Enhanced Addok Entrypoint with OpenTelemetry - Application Mode
-echo "=== Addok BAN Application Startup v2.1.5-otel ===
+echo "=== Addok BAN Application Startup v2.1.5-otel ==="
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
@@ -88,27 +88,21 @@ start_application() {
     log "  Database: /data/addok.db"
     log "  OTEL Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-console}"
 
-    # Verify monitoring modules are available
-    if ! python3 -c "import sys; sys.path.insert(0, '/app'); from monitoring.telemetry import initialize_telemetry" >/dev/null 2>&1; then
-        log "WARNING: OpenTelemetry monitoring modules not found, falling back to standard WSGI"
-        WSGI_MODULE="addok.http.wsgi"
-    else
+    # Check if monitoring modules are available
+    if [[ -f "/app/monitoring/telemetry.py" ]] && [[ -f "/app/wsgi_otel.py" ]]; then
         log "✓ OpenTelemetry modules found, using enhanced WSGI"
         WSGI_MODULE="wsgi_otel:application"
+    else
+        log "WARNING: OpenTelemetry monitoring modules not found, falling back to standard WSGI"
+        WSGI_MODULE="addok.http.wsgi"
     fi
     
-    # Start gunicorn with OpenTelemetry
+    # Start gunicorn with OpenTelemetry using configuration file
     exec gunicorn \
+        --config /app/gunicorn.conf.py \
         --workers "$workers" \
         --timeout "$timeout" \
         --bind "0.0.0.0:$port" \
-        --access-logfile - \
-        --error-logfile - \
-        --log-level info \
-        --preload \
-        --worker-class sync \
-        --max-requests 1000 \
-        --max-requests-jitter 100 \
         "$WSGI_MODULE"
 }
 
