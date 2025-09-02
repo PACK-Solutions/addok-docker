@@ -3,17 +3,20 @@ Custom Falcon middleware for OpenTelemetry integration.
 Provides distributed tracing and metrics collection for Falcon applications.
 """
 
+import os
 import time
 import logging
 from typing import Optional
-from opentelemetry import trace
+from opentelemetry import trace, propagate
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import Status, StatusCode
 from .telemetry import get_telemetry
 from .metrics_endpoint import (
     record_http_request, 
     record_geocoding_operation, 
-    record_error
+    record_error,
+    MetricsResource,
+    HealthMetricsResource
 )
 
 logger = logging.getLogger(__name__)
@@ -28,9 +31,10 @@ class OpenTelemetryMiddleware:
     def process_request(self, req, resp):
         """Process incoming request - start span and record metrics"""
         try:
-            # Initialize tracer if not done
-            if not self.tracer and self.telemetry.tracer:
-                self.tracer = self.telemetry.tracer
+            # Always get fresh tracer reference (important for multi-worker setup)
+            current_tracer = self.telemetry.get_tracer()
+            if current_tracer:
+                self.tracer = current_tracer
             
             # Start timing
             req.start_time = time.time()
@@ -43,13 +47,29 @@ class OpenTelemetryMiddleware:
                 # Extract operation name from path
                 operation_name = self._get_operation_name(req)
                 
-                # Create span
+                # SENIOR DEV FIX: Extract incoming trace context from headers
+                ctx = propagate.extract(req.headers)
+                token = trace.context_api.attach(ctx)
+                
+                # Create span with proper context (manual approach since we can't use 'with')
                 span = self.tracer.start_span(
                     name=operation_name,
                     kind=trace.SpanKind.SERVER
                 )
                 
-                # Set span attributes
+                # Set span attributes with safe parameter parsing
+                try:
+                    limit = req.get_param_as_int('limit') or 5
+                except:
+                    limit = 5
+                
+                try:
+                    autocomplete = req.get_param_as_bool('autocomplete')
+                    if autocomplete is None:
+                        autocomplete = True
+                except:
+                    autocomplete = True
+                
                 span.set_attributes({
                     SpanAttributes.HTTP_METHOD: req.method,
                     SpanAttributes.HTTP_URL: req.url,
@@ -57,19 +77,27 @@ class OpenTelemetryMiddleware:
                     SpanAttributes.HTTP_USER_AGENT: req.user_agent or "",
                     SpanAttributes.HTTP_CLIENT_IP: self._get_client_ip(req),
                     "addok.query": req.get_param('q', '')[:100] if req.get_param('q') else "",
-                    "addok.limit": req.get_param_as_int('limit', 5),
-                    "addok.autocomplete": req.get_param_as_bool('autocomplete', True),
+                    "addok.limit": limit,
+                    "addok.autocomplete": autocomplete,
+                    "debug.span_created": True,
+                    "debug.tracer_id": id(self.tracer),
+                    "debug.worker_pid": os.getpid()
                 })
                 
-                # Store span in request context
-                req.span = span
+                # Store span and context token in request context (Falcon way)
+                req.context.otel_span = span
+                req.context.otel_token = token
+                logger.info(f"🔍 Started span: {operation_name} for {req.method} {req.path} (worker pid={os.getpid()})")
             else:
-                req.span = None
+                req.context.otel_span = None
+                req.context.otel_token = None
+                logger.warning(f"⚠️ No tracer available, skipping span creation for {req.method} {req.path} (worker pid={os.getpid()})")
                 
         except Exception as e:
-            logger.debug(f"Error in process_request: {e}")
+            logger.error(f"Error in process_request: {e}", exc_info=True)
             req.start_time = time.time()
-            req.span = None
+            req.context.otel_span = None
+            req.context.otel_token = None
     
     def process_response(self, req, resp, resource, req_succeeded):
         """Process response - complete span and record metrics"""
@@ -95,8 +123,9 @@ class OpenTelemetryMiddleware:
     def process_resource(self, req, resp, resource, params):
         """Process resource - add resource-specific attributes"""
         try:
-            if hasattr(req, 'span') and req.span:
-                req.span.set_attribute("addok.resource", resource.__class__.__name__)
+            span = getattr(req.context, 'otel_span', None)
+            if span:
+                span.set_attribute("addok.resource", resource.__class__.__name__)
         except Exception as e:
             logger.debug(f"Error in process_resource: {e}")
     
@@ -205,7 +234,10 @@ class OpenTelemetryMiddleware:
     def _complete_span(self, req, resp, req_succeeded: bool):
         """Complete the OpenTelemetry span"""
         try:
-            span = getattr(req, 'span', None)
+            # Get span and token from request context (Falcon way)
+            span = getattr(req.context, 'otel_span', None)
+            token = getattr(req.context, 'otel_token', None)
+            
             if not span:
                 return
                 
@@ -225,8 +257,21 @@ class OpenTelemetryMiddleware:
                 record_error(error_type)
                 self.telemetry.record_error(error_type, endpoint)
             
-            # End span
+            # SENIOR DEV FIX: End span and detach context properly
             span.end()
+            
+            # Detach context token if we have it
+            if token:
+                trace.context_api.detach(token)
+            
+            # Force flush to ensure span is exported immediately
+            try:
+                if self.telemetry.tracer_provider:
+                    self.telemetry.tracer_provider.force_flush(timeout_millis=1000)
+            except Exception as flush_error:
+                logger.debug(f"Failed to flush span: {flush_error}")
+            
+            logger.info(f"✅ Completed span for {req.method} {req.path} - status: {status_code} (worker pid={os.getpid()})")
             
         except Exception as e:
             logger.debug(f"Error completing span: {e}")
@@ -273,3 +318,18 @@ def create_telemetry_middleware() -> object:
     except Exception as e:
         logger.warning(f"Failed to create telemetry middleware: {e}")
         return MetricsMiddleware()  # Fallback to metrics only
+
+def add_metrics_routes(app):
+    """Add metrics endpoints to Falcon application"""
+    try:
+        # Add Prometheus metrics endpoint
+        app.add_route('/metrics', MetricsResource())
+        
+        # Add health metrics endpoint  
+        app.add_route('/health/metrics', HealthMetricsResource())
+        
+        logger.info("Added metrics routes to Falcon application")
+        
+    except Exception as e:
+        logger.error(f"Failed to add metrics routes: {e}")
+        raise
