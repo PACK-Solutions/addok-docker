@@ -44,10 +44,10 @@ def worker_exit(server, worker):
 
 # Gunicorn server configuration
 bind = "0.0.0.0:7878"
-workers = 4
+workers = 2  # Optimized: fewer workers with more memory per worker for large CSV processing
 worker_class = "sync"
 worker_connections = 1000
-timeout = 30
+timeout = 300  # Increased to 5 minutes for large CSV processing (10k rows)
 keepalive = 2
 max_requests = 1000
 max_requests_jitter = 100
