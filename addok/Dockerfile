@@ -22,6 +22,9 @@ COPY ./addok-src ./addok-src
 
 WORKDIR /build/addok-src
 
+# Install setuptools for Python 3.13
+RUN pip install --no-cache-dir setuptools wheel
+
 # Build the source distribution
 RUN python3 setup.py sdist
 
