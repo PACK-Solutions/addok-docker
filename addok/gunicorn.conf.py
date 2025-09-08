@@ -44,10 +44,10 @@ def worker_exit(server, worker):
 
 # Gunicorn server configuration
 bind = "0.0.0.0:7878"
-workers = 2  # Optimized: fewer workers with more memory per worker for large CSV processing
+workers = int(os.getenv('WORKERS', '4'))  # Redis 8 optimization: 4 workers aligned with 4 I/O threads
 worker_class = "sync"
 worker_connections = 1000
-timeout = 300  # Increased to 5 minutes for large CSV processing (10k rows)
+timeout = int(os.getenv('WORKER_TIMEOUT', '600'))  # Enhanced timeout for large CSV processing (12k rows)
 keepalive = 2
 max_requests = 1000
 max_requests_jitter = 100

@@ -122,9 +122,9 @@ ENV OTEL_LOGS_EXPORTER="otlp"
 ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true"
 ENV OTEL_LOG_LEVEL="debug"
 
-# Application configuration - aligned with gunicorn.conf.py
-ENV WORKERS=2
-ENV WORKER_TIMEOUT=300
+# Application configuration - aligned with gunicorn.conf.py  
+ENV WORKERS=4
+ENV WORKER_TIMEOUT=600
 ENV LOG_QUERIES=0
 ENV LOG_NOT_FOUND=0
 ENV SLOW_QUERIES=500
