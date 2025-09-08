@@ -1,6 +1,7 @@
 """
 OpenTelemetry telemetry configuration for Addok geocoding service.
 Provides centralized setup for tracing, metrics, and logging.
+Includes dual observability support for OpenTelemetry and Datadog.
 """
 
 import os
@@ -30,6 +31,14 @@ try:
     OTLP_AVAILABLE = True
 except ImportError:
     OTLP_AVAILABLE = False
+
+# Datadog tracing imports
+try:
+    import ddtrace
+    from ddtrace import tracer as dd_tracer
+    DATADOG_AVAILABLE = True
+except ImportError:
+    DATADOG_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +186,48 @@ class AddokTelemetry:
         except Exception as e:
             logger.error(f"Failed to initialize metrics: {e}")
             return False
+
+    def initialize_datadog(self) -> bool:
+        """Initialize Datadog tracing alongside OpenTelemetry"""
+        try:
+            # Check if Datadog tracing is enabled
+            if not DATADOG_AVAILABLE:
+                logger.info("Datadog ddtrace not available, skipping Datadog initialization")
+                return False
+                
+            dd_trace_enabled = os.getenv("DD_TRACE_ENABLED", "false").lower() == "true"
+            if not dd_trace_enabled:
+                logger.info("Datadog tracing disabled via DD_TRACE_ENABLED")
+                return False
+            
+            # Configure Datadog tracer
+            dd_agent_host = os.getenv("DD_AGENT_HOST", "datadog-agent.datadog.svc.cluster.local")
+            dd_agent_port = int(os.getenv("DD_AGENT_PORT", "8126"))
+            
+            # Configure Datadog with service info
+            ddtrace.config.service = os.getenv("DD_SERVICE", "addok-ban")
+            ddtrace.config.env = os.getenv("DD_ENV", "production")
+            ddtrace.config.version = os.getenv("DD_VERSION", "2.1.6")
+            
+            # Patch all supported libraries for automatic instrumentation
+            ddtrace.patch_all()
+            
+            # Configure the tracer
+            dd_tracer.configure(
+                hostname=dd_agent_host,
+                port=dd_agent_port,
+                priority_sampling=True,
+                collect_metrics=True
+            )
+            
+            logger.info(f"✅ Datadog tracing initialized: agent={dd_agent_host}:{dd_agent_port}")
+            logger.info(f"Datadog config: service={ddtrace.config.service}, env={ddtrace.config.env}, version={ddtrace.config.version}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Datadog tracing: {e}")
+            return False
     
     def _initialize_custom_metrics(self):
         """Initialize application-specific metrics"""
@@ -286,13 +337,18 @@ class AddokTelemetry:
         try:
             success = True
             
-            # Initialize tracing
+            # Initialize OpenTelemetry tracing
             if not self.initialize_tracing():
                 success = False
                 
-            # Initialize metrics  
+            # Initialize OpenTelemetry metrics  
             if not self.initialize_metrics():
                 success = False
+            
+            # Initialize Datadog tracing
+            datadog_success = self.initialize_datadog()
+            if not datadog_success:
+                logger.info("Datadog tracing not initialized (disabled or unavailable)")
             
             # Initialize auto-instrumentation if Flask app provided
             if app and not self.initialize_auto_instrumentation(app):
@@ -301,7 +357,8 @@ class AddokTelemetry:
             self.initialized = success
             
             if success:
-                logger.info("🚀 OpenTelemetry telemetry fully initialized")
+                dd_status = "✅ enabled" if datadog_success else "⚠️ disabled"
+                logger.info(f"🚀 Dual observability stack initialized: OpenTelemetry=✅ enabled, Datadog={dd_status}")
             else:
                 logger.error("⚠️ OpenTelemetry telemetry initialization incomplete")
                 

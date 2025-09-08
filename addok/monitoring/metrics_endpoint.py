@@ -1,21 +1,18 @@
 """
 Prometheus metrics endpoint for Addok geocoding service.
-Provides /metrics endpoint for Prometheus scraping.
+Provides /metrics endpoint for Prometheus scraping (Falcon compatible).
 """
 
 import os
 import sys
 import psutil
 import logging
-from flask import Blueprint, Response
+import falcon
 from prometheus_client import generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 from prometheus_client import Counter, Histogram, Gauge, Info, Enum
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-
-# Create blueprint for metrics
-metrics_bp = Blueprint('metrics', __name__)
 
 # Create custom registry for Prometheus metrics
 registry = CollectorRegistry()
@@ -97,53 +94,63 @@ response_time_summary = Histogram('addok_response_time_seconds',
 # Application startup time
 startup_time = datetime.now()
 
-@metrics_bp.route('/metrics')
-def prometheus_metrics():
-    """Prometheus metrics endpoint"""
-    try:
-        # Update system metrics
-        _update_system_metrics()
-        
-        # Update application metrics
-        _update_application_metrics()
-        
-        # Generate Prometheus metrics
-        return Response(generate_latest(registry), mimetype=CONTENT_TYPE_LATEST)
-        
-    except Exception as e:
-        logger.error(f"Error generating Prometheus metrics: {e}")
-        # Return empty metrics on error to avoid scraping failures
-        return Response("# Error generating metrics\n", mimetype=CONTENT_TYPE_LATEST)
+class MetricsResource:
+    """Falcon resource for Prometheus metrics endpoint"""
+    
+    def on_get(self, req, resp):
+        """Handle GET /metrics"""
+        try:
+            # Update system metrics
+            _update_system_metrics()
+            
+            # Update application metrics
+            _update_application_metrics()
+            
+            # Generate Prometheus metrics
+            resp.content_type = CONTENT_TYPE_LATEST
+            resp.text = generate_latest(registry).decode('utf-8')
+            resp.status = falcon.HTTP_200
+            
+        except Exception as e:
+            logger.error(f"Error generating Prometheus metrics: {e}")
+            # Return empty metrics on error to avoid scraping failures
+            resp.content_type = CONTENT_TYPE_LATEST
+            resp.text = "# Error generating metrics\n"
+            resp.status = falcon.HTTP_500
 
-@metrics_bp.route('/health/metrics')
-def health_metrics():
-    """Health check with basic metrics"""
-    try:
-        _update_system_metrics()
-        
-        # Basic health information
-        process = psutil.Process()
-        memory_info = process.memory_info()
-        
-        health_data = {
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'uptime_seconds': (datetime.now() - startup_time).total_seconds(),
-            'memory_usage_mb': round(memory_info.rss / 1024 / 1024, 2),
-            'cpu_percent': process.cpu_percent(),
-            'open_files': getattr(process, 'num_fds', lambda: 0)(),
-            'metrics_endpoint': '/metrics'
-        }
-        
-        return health_data, 200
-        
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            'status': 'unhealthy',
-            'timestamp': datetime.now().isoformat(),
-            'error': str(e)
-        }, 500
+class HealthMetricsResource:
+    """Falcon resource for health metrics endpoint"""
+    
+    def on_get(self, req, resp):
+        """Handle GET /health/metrics"""
+        try:
+            _update_system_metrics()
+            
+            # Basic health information
+            process = psutil.Process()
+            memory_info = process.memory_info()
+            
+            health_data = {
+                'status': 'healthy',
+                'timestamp': datetime.now().isoformat(),
+                'uptime_seconds': (datetime.now() - startup_time).total_seconds(),
+                'memory_usage_mb': round(memory_info.rss / 1024 / 1024, 2),
+                'cpu_percent': process.cpu_percent(),
+                'open_files': getattr(process, 'num_fds', lambda: 0)(),
+                'metrics_endpoint': '/metrics'
+            }
+            
+            resp.media = health_data
+            resp.status = falcon.HTTP_200
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            resp.media = {
+                'status': 'unhealthy',
+                'timestamp': datetime.now().isoformat(),
+                'error': str(e)
+            }
+            resp.status = falcon.HTTP_500
 
 def _update_system_metrics():
     """Update system-level metrics"""
