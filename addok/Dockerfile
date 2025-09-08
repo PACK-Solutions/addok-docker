@@ -31,7 +31,7 @@ RUN python3 setup.py sdist
 # Pre-compile all Python packages in builder stage
 RUN pip wheel --no-cache-dir \
     cython \
-    falcon==4.1.0 \
+    falcon==4.0.2 \
     ./dist/addok-*.tar.gz \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
@@ -58,7 +58,7 @@ RUN pip install --no-cache-dir \
     --find-links /build/wheels \
     --prefix /build/python-install \
     cython \
-    falcon==4.1.0 \
+    falcon==4.0.2 \
     addok \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
@@ -80,7 +80,8 @@ RUN pip install --no-cache-dir \
     pip>=23.3
 
 # Force upgrade Falcon to ensure 4.1.0+ is used
-RUN pip install --no-cache-dir --prefix /build/python-install --upgrade falcon==4.1.0
+# Remove explicit falcon upgrade since addok conflicts with 4.1.0
+# RUN pip install --no-cache-dir --prefix /build/python-install --upgrade falcon==4.1.0
 
 # --- Final production image ---
 FROM python:3.13-alpine
