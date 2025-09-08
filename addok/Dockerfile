@@ -44,7 +44,7 @@ RUN pip wheel --no-cache-dir \
     prometheus-client==0.19.0 \
     psutil \
     ddtrace \
-    falcon \
+    falcon>=4.1.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3 \
@@ -71,7 +71,7 @@ RUN pip install --no-cache-dir \
     prometheus-client==0.19.0 \
     psutil \
     ddtrace \
-    falcon \
+    falcon>=4.1.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3
