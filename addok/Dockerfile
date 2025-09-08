@@ -28,6 +28,7 @@ RUN python3 setup.py sdist
 # Pre-compile all Python packages in builder stage
 RUN pip wheel --no-cache-dir \
     cython \
+    falcon>=4.1.0 \
     ./dist/addok-*.tar.gz \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
@@ -44,7 +45,6 @@ RUN pip wheel --no-cache-dir \
     prometheus-client==0.19.0 \
     psutil \
     ddtrace \
-    falcon>=4.1.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3 \
@@ -55,6 +55,7 @@ RUN pip install --no-cache-dir \
     --find-links /build/wheels \
     --prefix /build/python-install \
     cython \
+    falcon>=4.1.0 \
     addok \
     addok-fr==1.0.1 \
     addok-france==1.1.3 \
@@ -71,7 +72,6 @@ RUN pip install --no-cache-dir \
     prometheus-client==0.19.0 \
     psutil \
     ddtrace \
-    falcon>=4.1.0 \
     python-geohash==0.8.5 \
     setuptools>=78.1.1 \
     pip>=23.3
