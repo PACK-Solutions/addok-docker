@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.13-alpine AS builder
+FROM python:3.11-alpine AS builder
 
 WORKDIR /build
 
@@ -84,7 +84,7 @@ RUN pip install --no-cache-dir \
 # RUN pip install --no-cache-dir --prefix /build/python-install --upgrade falcon==4.1.0
 
 # --- Final production image ---
-FROM python:3.13-alpine
+FROM python:3.11-alpine
 
 # Create non-root user (Alpine way)
 RUN addgroup -g 1000 addok && \
@@ -102,7 +102,7 @@ RUN apk add --no-cache \
     ncurses \
     readline
 
-COPY --from=builder /build/python-install/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages/
+COPY --from=builder /build/python-install/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages/
 COPY --from=builder /build/python-install/bin /usr/local/bin/
 
 # Create directories with proper ownership
@@ -115,7 +115,7 @@ ENV REDIS_HOST=redis
 ENV REDIS_PORT=6379
 ENV REDIS_DB_INDEXES=0
 ENV SQLITE_DB_PATH=/data/addok.db
-ENV PYTHONPATH=/usr/local/lib/python3.13/site-packages
+ENV PYTHONPATH=/usr/local/lib/python3.11/site-packages
 
 # OpenTelemetry configuration
 ENV OTEL_SERVICE_NAME="addok-ban"
